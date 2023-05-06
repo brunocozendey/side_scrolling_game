@@ -1,0 +1,3 @@
+/home/bcozendey/GIT/UERJ/side_scrolling_game/cmake-build-debug/CMakeFiles/side_scrolling_game.dir
+/home/bcozendey/GIT/UERJ/side_scrolling_game/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/bcozendey/GIT/UERJ/side_scrolling_game/cmake-build-debug/CMakeFiles/rebuild_cache.dir
