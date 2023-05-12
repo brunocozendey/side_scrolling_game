@@ -1,220 +1,484 @@
-// https://cs.lmu.edu/~ray/notes/openglexamples/
-// g++ litsolids.cpp -lX11 -lGL -lGLU -lglut -g -Wall -O2 -o r.exe
-//
-// This program shows three cyan objects illuminated with a single yellow
-// light source.  It illustrates several of the lighting parameters.
-
-#ifdef __APPLE_CC__
-#include <GLUT/glut.h>
-#else
 #include <GL/glut.h>
-#endif
+#include <math.h>
+#include <string>
 #include <iostream>
+#include<cstdlib>
 using namespace std;
 
-char axis='x';
+const double PI = 3.141592654;
 
-void drawTable() {
-    // Draw tabletop
-    glPushMatrix();
-    glColor3f(1.0, 0.0, 0.0);
-    glTranslatef(0.0, 1.4, 0.0);
-    glScalef(1.5, 0.2, 1.0);
-    glutSolidCube(2.0);
-    glPopMatrix();
+int frameNumber = 0;
 
-    // Draw table legs
-    glPushMatrix();
-    glColor3f(1.0, 0.0, 0.0);
-    glTranslatef(0.9, 0.7, 0.4);
-    glScalef(0.2, 1.4, 0.1);
-    glutSolidCube(1.0);
-    glPopMatrix();
+float width = 700;
+float height = 500;
+float aspect = width / height;
 
-    glPushMatrix();
-    glColor3f(1.0, 0.0, 0.0);
-    glTranslatef(-0.9, 0.7, 0.4);
-    glScalef(0.2, 1.4, 0.1);
-    glutSolidCube(1.0);
-    glPopMatrix();
+float x_min = 0;
+float x_max = 7;
 
-    glPushMatrix();
-    glColor3f(1.0, 0.0, 0.0);
-    glTranslatef(0.9, 0.7, -0.4);
-    glScalef(0.2, 1.4, 0.1);
-    glutSolidCube(1.0);
-    glPopMatrix();
+float h = 0.4;
 
-    glPushMatrix();
-    glColor3f(1.0, 0.0, 0.0);
-    glTranslatef(-0.9, 0.7, -0.4);
-    glScalef(0.2, 1.4, 0.1);
-    glutSolidCube(1.0);
-    glPopMatrix();
+int life = 3;
 
-    // Draw ball
-    glPushMatrix();
-    glColor3f(1.0, 0.0, 0.0);
-    glTranslatef(0.0, 2.0, 0.0);
-    glutSolidSphere(0.4, 20, 20);
-    glPopMatrix();
-}
+bool game_started = false;
 
-// Clears the window and depth buffer and draws three solids.
-//
-// The solids are placed so that they either sit or float above the x-z plane;
-// therefore note one of the first things that is done is to rotate the whole
-// scene 20 degrees about x to turn the top of the scene toward the viewer.
-// This lets the viewer see how the torus goes around the cone.
-void display() {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    glPushMatrix();
-
-    // Rotate the scene so we can see the tops of the shapes.
-    switch ( axis )
-    {
-        case 'x':
-            glRotatef(0.0, 1.0, 0.0, 0.0);
-            break;
-        case 'y':
-            glRotatef(90.0, 1.0, 0.0, 0.0);
-            break;
-        case 'z':
-            glRotatef(90.0, 0.0, 1.0, 0.0);
-            break;
+/*
+ * Draw a 32-sided regular polygon as an approximation for a circular disk.
+ * (This is necessary since OpenGL has no commands for drawing ovals, circles,
+ * or curves.)  The disk is centered at (0,0) with a radius given by the
+ * parameter.
+ */
+void drawDisk(double radius) {
+    int d;
+    glBegin(GL_POLYGON);
+    for (d = 0; d < 32; d++) {
+        double angle = (2*PI/32) * d;
+        glVertex2d( radius*cos(angle), radius*sin(angle));
     }
-
-//    // Make a torus floating 0.5 above the x-z plane.  The standard torus in
-//    // the GLUT library is, perhaps surprisingly, a stack of circles which
-//    // encircle the z-axis, so we need to rotate it 90 degrees about x to
-//    // get it the way we want.
-//    glPushMatrix();
-//    glTranslatef(-0.75, 0.5, 0.0);
-//    glRotatef(90.0, 1.0, 0.0, 0.0);
-//    glutSolidTorus(0.275, 0.85, 16, 40);
-//    glPopMatrix();
-//
-//    // Make a cone.  The standard cone "points" along z; we want it pointing
-//    // along y, hence the 270 degree rotation about x.
-//    glPushMatrix();
-//    glTranslatef(-0.75, -0.5, 0.0);
-//    glRotatef(270.0, 1.0, 0.0, 0.0);
-//    glutSolidCone(1.0, 2.0, 70, 12);
-//    glPopMatrix();
-//
-//    // Add a sphere to the scene.
-//    glPushMatrix();
-//    glTranslatef(0.75, 0.0, -1.0);
-//    glutSolidSphere(1.0, 30, 30);
-//    glPopMatrix();
-
-    drawTable();
-    glPopMatrix();
-    glFlush();
+    glEnd();
 }
 
-void keyboard(GLubyte key, GLint x, GLint y)
+void drawSquare()
 {
-    switch(key) {
-        case 120:
-            axis = 'x';
-            printf("x");
-            break;
-        case 121:
-            axis = 'y';
-            printf("y");
-            break;
-        case 122:
-            axis = 'z';
-            printf("z");
-            break;
+    glBegin(GL_QUADS);
+    glVertex2f(-1.0,-1.0);
+    glVertex2f(1.0,-1.0);
+    glVertex2f(1.0,1.0);
+    glVertex2f(-1.0,1.0);
+    glEnd();
+}
+
+/*
+ * Draw a wheel, centered at (0,0) and with radius 1. The wheel has 15 spokes
+ * that rotate in a clockwise direction as the animation proceeds.
+ */
+void drawWheel() {
+    int i;
+    glColor3f(0,0,0);
+    drawDisk(1);
+    glColor3f(0.75f, 0.75f, 0.75f);
+    drawDisk(0.8);
+    glColor3f(0,0,0);
+    drawDisk(0.2);
+    glRotatef(frameNumber*20,0,0,1);
+    glBegin(GL_LINES);
+    for (i = 0; i < 15; i++) {
+        glVertex2f(0,0);
+        glVertex2d(cos(i*2*PI/15), sin(i*2*PI/15));
+    }
+    glEnd();
+}
+//Generate How many coins will get
+void generateCoin(){
+    int offset = 1;
+    int range = 1.5;
+    int random = offset + (rand() % range);
+}
+
+void coinBox(){
+    glColor3f(0, 1, 0);
+    glBegin(GL_QUADS);
+    glVertex2f(-0.2,-0.2);
+    glVertex2f(0.2,-0.2);
+    glVertex2f(0.2,0.2);
+    glVertex2f(-0.2,0.2);
+    glEnd();
+}
+
+void drawCoin(){
+    coinBox();
+    glColor3f(1, 1, 0);
+    drawDisk(0.2);
+    glColor3f(0.75f, 0.75f, 0.25f);
+    drawDisk(0.18);
+}
+
+void drawHeart(){
+    glColor3f(1, 0, 0);
+    drawDisk(0.15);
+    glTranslatef(0.20,0,0);
+    drawDisk(0.15);
+    glTranslatef(-0.50,-0.31f,0);
+    glBegin(GL_POLYGON);
+    glVertex2f(0.2f,0.2f);
+    glVertex2f(0.4f,-0.1f);
+    glVertex2f(0.6f,0.2f);
+    glEnd();
+}
+
+void manBox(){
+    glColor3f(0, 0, 1);
+    glBegin(GL_QUADS);
+    glVertex2f(-0.15,-0.4);
+    glVertex2f(0.15,-0.4);
+    glVertex2f(0.15,0.9);
+    glVertex2f(-0.15,0.9);
+    glEnd();
+}
+
+void drawMan(){
+    manBox();
+    glColor3f(1, 0, 0);
+    // Draw the head
+    glTranslatef(0,0.7,0);
+    drawDisk(0.15);
+
+    // Draw the body
+    glTranslatef(-0.1,-0.8,0);
+    glLineWidth(6);  // Set the line width to be 6 pixels.
+    glBegin(GL_LINES);
+    glVertex2f(0.1,0.7);
+    glVertex2f(0.1,-0.1);
+    glEnd();
+
+    // Draw the arms
+    glBegin(GL_LINES);
+    glVertex2f(0.1, 0.4);
+    glVertex2f(0.4, 0.4);
+    glVertex2f(0.1, 0.2);
+    glVertex2f(0.4, 0.2);
+    glEnd();
+
+    // Draw the legs
+    glBegin(GL_LINES);
+    if (frameNumber%5==0){
+        glVertex2f(0.0, -0.3);
+        glVertex2f(0.1, 0.0);
+        glVertex2f(0.1, 0.0);
+        glVertex2f(0.2, -0.3);
+    }
+    else{
+        glVertex2f(0.1, -0.3);
+        glVertex2f(0.1, 0.0);
+        glVertex2f(0.1, 0.0);
+        glVertex2f(0.1, -0.3);
+    }
+    glEnd();
+    glLineWidth(1);
+}
+/*
+ * Draw a cart consisting of a rectangular body and two wheels.  The wheels
+ * are drawn by the drawWheel() method; a different translation is applied to each
+ * wheel to move them into position under the body.  The body of the cart
+ * is a red rectangle with corner at (0,-2.5), width 5, and height 2.  The
+ * center of the bottom of the rectangle is at (0,0).
+ */
+void drawCart() {
+    glPushMatrix();
+    glTranslatef(-1.5f, -0.1f, 0);
+    glScalef(0.8f,0.8f,1);
+    drawWheel();
+    glPopMatrix();
+    glPushMatrix();
+    glTranslatef(1.5f, -0.1f, 0);
+    glScalef(0.8f,0.8f,1);
+    drawWheel();
+    glPopMatrix();
+    glColor3f(1,0,0);
+    glPushMatrix();
+    glTranslatef(0, 0.7f, 0);
+    glScalef(3,0.8f,1);
+    drawSquare();
+    glPopMatrix();
+    glPushMatrix();
+    glTranslatef(-0.5, 2.0, 0);
+    glScalef(1.5,0.8,1);
+    drawSquare();
+    glPopMatrix();
+}
+
+/*
+ * Draw a sun with radius 0.5 centered at (0,0).  There are also 13 rays which
+ * extend outside from the sun for another 0.25 units.
+ */
+void drawSun() {
+    int i;
+    glColor3f(1,1,0);
+    for (i = 0; i < 13; i++) { // Draw 13 rays, with different rotations.
+        glRotatef( 360 / 13, 0, 0, 1 ); // Note that the rotations accumulate!
+        glBegin(GL_LINES);
+        glVertex2f(0, 0);
+        glVertex2f(0.75f, 0);
+        glEnd();
+    }
+    drawDisk(0.5);
+    glColor3f(0,0,0);
+}
+
+/*
+ * Draw a windmill, consisting of a pole and three vanes.  The pole extends from the
+ * point (0,0) to (0,3).  The vanes radiate out from (0,3).  A rotation that depends
+ * on the frame number is applied to the whole set of vanes, which causes the windmill
+ * to rotate as the animation proceeds.  Note that this method changes the current
+ * transform in the GL context gl!  The caller of this subroutine should take care
+ * to save and restore the original transform, if necessary.
+ */
+void drawWindmill() {
+    int i;
+    glColor3f(0.8f, 0.8f, 0.9f);
+    glBegin(GL_POLYGON);
+    glVertex2f(-0.05f, 0);
+    glVertex2f(0.05f, 0);
+    glVertex2f(0.05f, 3);
+    glVertex2f(-0.05f, 3);
+    glEnd();
+    glTranslatef(0, 3, 0);
+    glRotatef(float(frameNumber)/5,0,0,1);
+    glColor3f(0.4f, 0.4f, 0.8f);
+    for (i = 0; i < 3; i++) {
+        glRotated(120, 0, 0, 1);  // Note: These rotations accumulate.
+        glBegin(GL_POLYGON);
+        glVertex2f(0,0);
+        glVertex2f(0.5f, 0.1f);
+        glVertex2f(1.5f,0);
+        glVertex2f(0.5f, -0.1f);
+        glEnd();
     }
 }
 
-// We don't want the scene to get distorted when the window size changes, so
-// we need a reshape callback.  We'll always maintain a range of -2.5..2.5 in
-// the smaller of the width and height for our viewbox, and a range of -10..10
-// for the viewbox depth.
+/*
+ * This function is called when the image needs to be redrawn.
+ * It is installed by main() as the GLUT display function.
+ * It draws the current frame of the animation.
+ */
+void display() {
 
-//PARAMETROS glOrtho
-//left, right :Specify the coordinates for the left and right vertical clipping planes.
-//bottom, top :Specify the coordinates for the bottom and top horizontal clipping planes.
-//nearVal, farVal:Specify the distances to the nearer and farther depth clipping planes. These values are negative if the plane is to be behind the viewer.
 
-void reshape(GLint w, GLint h) {
-    glViewport(0, 0, w, h);
     glMatrixMode(GL_PROJECTION);
-    GLfloat aspect = GLfloat(w) / GLfloat(h);
     glLoadIdentity();
 
-    if (w <= h) {
-        // width is smaller, so stretch out the height
-        glOrtho(-2.5, 2.5, -2.5/aspect, 2.5/aspect, -10.0, 10.0);
-    } else {
-        // height is smaller, so stretch out the width
-        glOrtho(-2.5*aspect, 2.5*aspect, -2.5, 2.5, -10.0, 10.0);
+    x_min = (-10.0+float(frameNumber)/100);
+    x_max = (-6.0 +float(frameNumber)/100);
+
+    if (x_max>=13)frameNumber = 0.0;
+
+
+    if (aspect >= 1.0) {
+        x_min = x_min* aspect;
+        x_max = x_max* aspect;
+//x_max = 10.5;
+//x_min = -4;
+        glOrtho(x_min, x_max, -1.0, 4.0, 1.0, -1.0);
+    }
+    else
+     glOrtho(x_min, x_max, -1.0 / aspect, 4.0 / aspect, 1.0, -1.0);
+
+
+
+
+    glClear(GL_COLOR_BUFFER_BIT); // Fills the scene with blue.
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    glColor3f(0, 0.6f, 0.2f);
+    glBegin(GL_POLYGON);
+    glVertex2f(-25,-1);
+    glVertex2f(1,-1);
+    glVertex2f(1,1);
+    glVertex2f(-25,1);
+    glEnd();
+    /* Draw three green triangles to form a ridge of hills in the background */
+//    glColor3f(0, 0.6f, 0.2f);
+//    glBegin(GL_POLYGON);
+//    glVertex2f(-10,-1);
+//    glVertex2f(-6,3.25f);
+//    glVertex2f(6,-1);
+//    glEnd();
+    glBegin(GL_POLYGON);
+    glVertex2f(-3,-1);
+    glVertex2f(1.5f,1.65f);
+    glVertex2f(5,-1);
+    glEnd();
+    glBegin(GL_POLYGON);
+    glVertex2f(-3,-1);
+    glVertex2f(3,2.1f);
+    glVertex2f(7,-1);
+    glEnd();
+    glBegin(GL_POLYGON);
+    glVertex2f(0,-1);
+    glVertex2f(6,2.5f);
+    glVertex2f(20,-1);
+    glEnd();
+//    glBegin(GL_POLYGON);
+//    glVertex2f(6,-1);
+//    glVertex2f(14,2.5f);
+//    glVertex2f(15,-1);
+//    glEnd();
+    glColor3f(0, 0.6f, 0.2f);
+    glBegin(GL_POLYGON);
+    glVertex2f(11,-1);
+    glVertex2f(25,-1);
+    glVertex2f(25,1);
+    glVertex2f(11,1);
+    glEnd();
+
+    /* Draw a bluish-gray rectangle to represent the road. */
+
+    glColor3f(0.4f, 0.4f, 0.5f);
+    glBegin(GL_POLYGON);
+    glVertex2f(-25,-0.4f);
+    glVertex2f(20,-0.4f);
+    glVertex2f(20,0.4f);
+    glVertex2f(-25,0.4f);
+    glEnd();
+
+    /* Draw a white line to represent the stripe down the middle
+     * of the road. */
+
+    glLineWidth(6);  // Set the line width to be 6 pixels.
+    glColor3f(1,1,1);
+    glBegin(GL_LINES);
+    glVertex2f(-25,0);
+    glVertex2f(20,0);
+    glEnd();
+    glLineWidth(1);  // Reset the line width to be 1 pixel.
+
+    /* Draw the sun.  The drawSun method draws the sun centered at (0,0).  A 2D translation
+     * is applied to move the center of the sun to (5,3.3).   A rotation makes it rotate*/
+
+    glPushMatrix();
+    glTranslated(x_max-0.8,3.2,0);
+    glRotatef(float(-frameNumber)/4,0,0,1);
+    glScalef(-0.8,-0.8,1);
+    drawSun();
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslated(x_max-3,1.7,0);
+    glRotatef(float(-frameNumber)*10,0,1,0);
+    drawCoin();
+    glPopMatrix();
+
+    for (int i=0;i<life;i++){
+        glPushMatrix();
+        glTranslated(x_min+0.2+i*0.3,3.8,0);
+        glScalef(0.55,0.55,0);
+        drawHeart();
+        glPopMatrix();
     }
 
 
-    //gluPerspective (60,aspect, 0.1, 15);
+    /* Draw three windmills.  The drawWindmill method draws the windmill with its base
+     * at (0,0), and the top of the pole at (0,3).  Each windmill is first scaled to change
+     * its size and then translated to move its base to a different paint.  In the animation,
+     * the vanes of the windmill rotate.  That rotation is done with a transform inside the
+     * drawWindmill method. */
 
-}
+//    glPushMatrix();
+//    glTranslated(0.75,1,0);
+//    glScaled(0.6,0.6,1);
+//    drawWindmill();
+//    glPopMatrix();
+//
+//    glPushMatrix();
+//    glTranslated(2.2,1.6,0);
+//    glScaled(0.4,0.4,1);
+//    drawWindmill();
+//    glPopMatrix();
+//
+//    glPushMatrix();
+//    glTranslated(3.7,0.8,0);
+//    glScaled(0.7,0.7,1);
+//    drawWindmill();
+//    glPopMatrix();
 
-// Performs application specific initialization.  It defines lighting
-// parameters for light source GL_LIGHT0: black for ambient, yellow for
-// diffuse, white for specular, and makes it a directional source
-// shining along <-1, -1, -1>.  It also sets a couple material properties
-// to make cyan colored objects with a fairly low shininess value.  Lighting
-// and depth buffer hidden surface removal are enabled here.
+    /* Draw the cart.  The drawCart method draws the cart with the center of its base at
+     * (0,0).  The body of the cart is 5 units long and 2 units high.  A scale is first
+     * applied to the cart to make its size more reasonable for the picture.  Then a
+     * translation is applied to move the cart horizontally.  The amount of the translation
+     * depends on the frame number, which makes the cart move from left to right across
+     * the screen as the animation progresses.  The cart animation repeats every 300
+     * frames.  At the beginning of the animation, the cart is off the left edge of the
+     * screen. */
+
+    glPushMatrix();
+//    glTranslated(3, 0, 0);
+//    glTranslated(-4.5+float(frameNumber)/71, 0, 0);
+    glTranslated(1+x_min, h, 0);
+//    glScaled(0.3,0.3,1);
+//    drawCart();
+    drawMan();
+    glPopMatrix();
+
+    glutSwapBuffers();
+
+}  // end display
+
+
+/*
+ * This method is called from main() to initialize OpenGL.
+ */
 void init() {
+    glClearColor(0.5f, 0.5f, 1, 1);
+    // The next three lines set up the coordinates system.
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho( x_min,x_max, -1.0, 4.0, 1.0, -1.0);
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    glRotatef(90.0, 1.0, 0.0, 0.0);
-    //gluLookAt(0, 2.5, 0, 0,0,0, 0, 0, -1);
+}
 
+void doFrame(int v) {
+    frameNumber++;
+    if (h>0.4  and frameNumber%2==0) h=h-0.1;
+    glutPostRedisplay();
+    glutTimerFunc(30,doFrame,0);
+}
 
-    GLfloat black[] = { 0.0, 0.0, 0.0, 1.0 };
-    GLfloat yellow[] = { 1.0, 1.0, 0.0, 1.0 };
-    GLfloat cyan[] = { 0.0, 1.0, 1.0, 1.0 };
-    GLfloat white[] = { 1.0, 1.0, 1.0, 1.0 };
-    GLfloat direction[] = { 0.0, -10.0, 0.0, 1.0 };
-    GLfloat direction1[] = { 0.0, 10.0, 0.0, 1.0 };
+void reshape ( int w, int h) {
 
-    glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, cyan);
-    glMaterialfv(GL_FRONT, GL_SPECULAR, white);
-    glMaterialf(GL_FRONT, GL_SHININESS, 30);
+    width = w;
+    height = h;
 
-    glLightfv(GL_LIGHT0, GL_AMBIENT, black);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, yellow);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, white);
-    glLightfv(GL_LIGHT0, GL_POSITION, direction);
+    glViewport(0,0,w,h);
+    aspect = (GLfloat)w / (GLfloat)h;
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
 
-    glLightfv(GL_LIGHT1, GL_AMBIENT, black);
-    glLightfv(GL_LIGHT1, GL_DIFFUSE, white);
-    glLightfv(GL_LIGHT1, GL_SPECULAR, white);
-    glLightfv(GL_LIGHT1, GL_POSITION, direction1);
-
-    glEnable(GL_LIGHTING);                // so the renderer considers light
-    glEnable(GL_LIGHT0);                  // turn LIGHT0 on
-    glEnable(GL_LIGHT1);
-    glEnable(GL_DEPTH_TEST);              // so the renderer considers depth
+    if (aspect >= 1.0){
+        x_min = x_min*aspect;
+        x_max = x_max*aspect;
+        glOrtho( x_min,x_max, -1.0, 4.0, 1.0, -1.0);
+    }
+    else
+        glOrtho(x_min, x_max, -1.0/aspect, 4.0/aspect, 1.0, -1.0);
 
 }
 
-// The usual application statup code.
+void startGame(){
+    glutTimerFunc(30,doFrame,0);
+}
+void keyboard( unsigned char key, int x, int y )
+{
+    switch( key ) {
+        case 'j' : case 'J' :
+            if (h < 1.0 and game_started)
+                h = 1.0;
+            break;
+        case 's' : case 'S' :
+            game_started = true;
+            startGame();
+            break;
+    }
+    display();
+}
+
 int main(int argc, char** argv) {
     glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB | GLUT_DEPTH);
-    glutInitWindowPosition(80, 80);
-    glutInitWindowSize(800, 600);
-    glutCreateWindow("The ball is on the table");
+    glutInitDisplayMode(GLUT_DOUBLE);
+    glutInitWindowSize(width, height);
+    glutInitWindowPosition(100,100);
+    glutCreateWindow("OpenGL Hierarchical Modeling 2D Example");
     init();
-    glutReshapeFunc(reshape);
-    glutKeyboardFunc(keyboard);
+
     glutDisplayFunc(display);
+    glutKeyboardFunc(keyboard);
+
+//    glutTimerFunc(30,doFrame,0);
+//    doFrame(0);
+    glutReshapeFunc(reshape);
     glutMainLoop();
+    return 0;
 }
+
