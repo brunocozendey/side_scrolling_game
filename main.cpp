@@ -31,6 +31,8 @@ bool hit = false;
 
 float angle = 0.0;
 
+float coins_x[5] = {-10,-5,0,2, 4};
+
 /*
  * Draw a 32-sided regular polygon as an approximation for a circular disk.
  * (This is necessary since OpenGL has no commands for drawing ovals, circles,
@@ -331,13 +333,16 @@ void display() {
     drawSun();
     glPopMatrix();
 
-    glPushMatrix();
-    float coin_x = -10;
     float coin_y = 1.7;
-    glTranslated(coin_x,coin_y,0);
-    glRotatef(float(-frameNumber)*10,0,1,0);
-    drawCoin();
-    glPopMatrix();
+    float coin_x = 0;
+    for (int i=0;i<4;i++){
+        coin_x = coins_x[i];
+        glPushMatrix();
+        glTranslated(coin_x,coin_y,0);
+        glRotatef(float(-frameNumber)*10,0,1,0);
+        drawCoin();
+        glPopMatrix();
+    }
 
     glPushMatrix();
     float hole_x = -12;
@@ -386,10 +391,13 @@ void display() {
     glPopMatrix();
 
     //Check Hearth Contact
-    if ((1+x_min+0.3 >= coin_x) and (1+x_min<=coin_x+0.4)){
-        if (h+1.3>=coin_y){
-            if (life < 5)
-            life++;
+    for (int i = 0; i<5;i++){
+        if ((1+x_min+0.3 >= coins_x[i]) and (1+x_min<=coins_x[i]+0.4)){
+            if (h+1.3>=coin_y){
+                coins_x[i] = -50;
+                if (life < 5)
+                    life++;
+            }
         }
     }
 

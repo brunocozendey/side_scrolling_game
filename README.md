@@ -12,7 +12,7 @@ movimentação do personagem principal;
 - [X] Personagem construído a partir de: quadriláteros, círculo e triângulo, centrados na origem;
 - [X] Personagem saltar ao acionarmos uma tecla do teclado. (Tecla j)
 - [ ] A cada vez que o personagem volta ao início da tela, os elementos de bonificação devem ser (aleatoriamente) adicionados à paisagem de forma apropriada;
-- [ ] Quando o personagem captura o elemento, o elemento deixa de aparecer na tela;
+- [X] Quando o personagem captura o elemento, o elemento deixa de aparecer na tela;
 - [X] Crie um enredo que dê utilidade para os elementos de bonificação criados. Os elementos podem atribuir poder (um salto mais alto por exemplo),
 energia ou vidas extras.
 - [X] Crie um enredo que justifique o elemento criado. Ao tocar no elemento, o personagem perde uma vida, perde energia ou perde um poder adquirido.
