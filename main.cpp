@@ -1,7 +1,12 @@
+#if defined(__linux__)
 #include <GL/glut.h>
+#endif
+#if defined(__APPLE__)
+    #include <OpenGL/gl.h>
+    #include <OpenGl/glu.h>
+    #include <GLUT/glut.h>
+#endif
 #include <math.h>
-#include <string>
-#include <iostream>
 #include<cstdlib>
 using namespace std;
 
@@ -21,6 +26,10 @@ float h = 0.4;
 int life = 3;
 
 bool game_started = false;
+bool on_jump = false;
+bool hit = false;
+
+float angle = 0.0;
 
 /*
  * Draw a 32-sided regular polygon as an approximation for a circular disk.
@@ -85,14 +94,6 @@ void coinBox(){
     glEnd();
 }
 
-void drawCoin(){
-    coinBox();
-    glColor3f(1, 1, 0);
-    drawDisk(0.2);
-    glColor3f(0.75f, 0.75f, 0.25f);
-    drawDisk(0.18);
-}
-
 void drawHeart(){
     glColor3f(1, 0, 0);
     drawDisk(0.15);
@@ -104,6 +105,17 @@ void drawHeart(){
     glVertex2f(0.4f,-0.1f);
     glVertex2f(0.6f,0.2f);
     glEnd();
+}
+
+void drawCoin(){
+    coinBox();
+    glColor3f(1, 1, 0);
+    drawDisk(0.2);
+    glColor3f(0.75f, 0.75f, 0.25f);
+    drawDisk(0.18);
+    glTranslatef(-0.04f,0.04f,0);
+    glScalef(0.4,0.4,1);
+    drawHeart();
 }
 
 void manBox(){
@@ -118,6 +130,7 @@ void manBox(){
 
 void drawMan(){
     manBox();
+    glRotatef(angle, 0.0f,0.0f,1.0f);
     glColor3f(1, 0, 0);
     // Draw the head
     glTranslatef(0,0.7,0);
@@ -156,35 +169,10 @@ void drawMan(){
     glEnd();
     glLineWidth(1);
 }
-/*
- * Draw a cart consisting of a rectangular body and two wheels.  The wheels
- * are drawn by the drawWheel() method; a different translation is applied to each
- * wheel to move them into position under the body.  The body of the cart
- * is a red rectangle with corner at (0,-2.5), width 5, and height 2.  The
- * center of the bottom of the rectangle is at (0,0).
- */
-void drawCart() {
-    glPushMatrix();
-    glTranslatef(-1.5f, -0.1f, 0);
-    glScalef(0.8f,0.8f,1);
-    drawWheel();
-    glPopMatrix();
-    glPushMatrix();
-    glTranslatef(1.5f, -0.1f, 0);
-    glScalef(0.8f,0.8f,1);
-    drawWheel();
-    glPopMatrix();
-    glColor3f(1,0,0);
-    glPushMatrix();
-    glTranslatef(0, 0.7f, 0);
-    glScalef(3,0.8f,1);
-    drawSquare();
-    glPopMatrix();
-    glPushMatrix();
-    glTranslatef(-0.5, 2.0, 0);
-    glScalef(1.5,0.8,1);
-    drawSquare();
-    glPopMatrix();
+
+void drawHole() {
+    glColor3f(0.0f, 0.0f, 0.0f);
+    drawDisk(.2);
 }
 
 /*
@@ -344,11 +332,21 @@ void display() {
     glPopMatrix();
 
     glPushMatrix();
-    glTranslated(x_max-3,1.7,0);
+    float coin_x = -10;
+    float coin_y = 1.7;
+    glTranslated(coin_x,coin_y,0);
     glRotatef(float(-frameNumber)*10,0,1,0);
     drawCoin();
     glPopMatrix();
 
+    glPushMatrix();
+    float hole_x = -12;
+    float hole_y = 0.0;
+    glTranslated(hole_x,hole_y,0);
+    drawHole();
+    glPopMatrix();
+
+    //Life Controll
     for (int i=0;i<life;i++){
         glPushMatrix();
         glTranslated(x_min+0.2+i*0.3,3.8,0);
@@ -382,24 +380,30 @@ void display() {
 //    drawWindmill();
 //    glPopMatrix();
 
-    /* Draw the cart.  The drawCart method draws the cart with the center of its base at
-     * (0,0).  The body of the cart is 5 units long and 2 units high.  A scale is first
-     * applied to the cart to make its size more reasonable for the picture.  Then a
-     * translation is applied to move the cart horizontally.  The amount of the translation
-     * depends on the frame number, which makes the cart move from left to right across
-     * the screen as the animation progresses.  The cart animation repeats every 300
-     * frames.  At the beginning of the animation, the cart is off the left edge of the
-     * screen. */
-
     glPushMatrix();
-//    glTranslated(3, 0, 0);
-//    glTranslated(-4.5+float(frameNumber)/71, 0, 0);
     glTranslated(1+x_min, h, 0);
-//    glScaled(0.3,0.3,1);
-//    drawCart();
     drawMan();
     glPopMatrix();
 
+    //Check Hearth Contact
+    if ((1+x_min+0.3 >= coin_x) and (1+x_min<=coin_x+0.4)){
+        if (h+1.3>=coin_y){
+            if (life < 5)
+            life++;
+        }
+    }
+
+    //Check Hole Contact
+    if ((1+x_min+0.3 >= hole_x) and (1+x_min<=hole_x+0.2)){
+        if (h<=0.5){
+            if (life >1){
+                angle =-45.0f;
+                game_started = false;
+                hit = true;
+                h = 0.0f;
+            }
+        }
+    }
     glutSwapBuffers();
 
 }  // end display
@@ -420,10 +424,12 @@ void init() {
 }
 
 void doFrame(int v) {
-    frameNumber++;
-    if (h>0.4  and frameNumber%2==0) h=h-0.1;
-    glutPostRedisplay();
-    glutTimerFunc(30,doFrame,0);
+        if (game_started) frameNumber++;
+        // Gambiarra para volta do pulo
+        if (h>0.5  and frameNumber%5==0) h=h-0.05;
+        if (h<=0.5) on_jump = false;
+        glutPostRedisplay();
+        glutTimerFunc(30,doFrame,0);
 }
 
 void reshape ( int w, int h) {
@@ -453,10 +459,20 @@ void keyboard( unsigned char key, int x, int y )
 {
     switch( key ) {
         case 'j' : case 'J' :
-            if (h < 1.0 and game_started)
+            if (h < 1.0 and game_started and on_jump==false)
                 h = 1.0;
+                on_jump = true;
             break;
         case 's' : case 'S' :
+            if (hit){
+                life--;
+                game_started = true;
+                hit = false;
+                angle = 0.0f;
+                h = 0.4f;
+                frameNumber = frameNumber + 40;
+                break;
+            }
             game_started = true;
             startGame();
             break;
@@ -469,14 +485,12 @@ int main(int argc, char** argv) {
     glutInitDisplayMode(GLUT_DOUBLE);
     glutInitWindowSize(width, height);
     glutInitWindowPosition(100,100);
-    glutCreateWindow("OpenGL Hierarchical Modeling 2D Example");
+    glutCreateWindow("Scrolling Game");
     init();
 
     glutDisplayFunc(display);
     glutKeyboardFunc(keyboard);
 
-//    glutTimerFunc(30,doFrame,0);
-//    doFrame(0);
     glutReshapeFunc(reshape);
     glutMainLoop();
     return 0;
